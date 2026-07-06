@@ -6,11 +6,14 @@ import {
   updateRoom,
   deleteRoom,
 } from "../controllers/roomController.js";
-import { protect } from "../middleware/authMiddleware.js";
+
+// ✅ FIXED IMPORT
+import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect); // Login check from flowchart (Yes branch) applies to all routes below
+// 🔒 Login check for all routes
+router.use(verifyToken);
 
 router.post("/", addRoom);
 router.get("/", getRooms);

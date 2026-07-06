@@ -1,208 +1,91 @@
+import User from "../models/User.js";
+import Otp from "../models/Otp.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-// MODELS
-import Staff from "../models/Staff.js";
-import Patient from "../models/user.js";
-import Otp from "../models/Otp.js";
-
-// UTILS
-import generateToken from "../utils/generateToken.js";
-import { generateOtp } from "../utils/generateOtp.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
-
-// ================================
-// 👨‍⚕️ STAFF REGISTER (ADMIN/STAFF)
-// ================================
-export const registerStaff = async (req, res) => {
-  try {
-    const { name, email, password, designation } = req.body;
-
-    const existing = await Staff.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ message: "Staff already exists" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const staff = await Staff.create({
-      name,
-      email,
-      password: hashedPassword,
-      designation,
-    });
-
-    res.status(201).json({
-      _id: staff._id,
-      name: staff.name,
-      email: staff.email,
-      token: generateToken(staff._id),
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
-// ================================
-// 👨‍⚕️ STAFF LOGIN
-// ================================
-export const loginStaff = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const staff = await Staff.findOne({ email });
-
-    if (!staff) {
-      return res.status(404).json({ message: "Staff not found" });
-    }
-
-    const isMatch = await bcrypt.compare(password, staff.password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    res.json({
-      _id: staff._id,
-      name: staff.name,
-      email: staff.email,
-      designation: staff.designation,
-      token: generateToken(staff._id),
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
-// ================================
-// 🧑‍⚕️ PATIENT REGISTER (OTP FLOW)
-// ================================
-export const registerPatient = async (req, res) => {
+// 🔥 REGISTER
+export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    const existing = await Patient.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ message: "Patient already exists" });
-    }
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const patient = await Patient.create({
+    const user = await User.create({
       name,
       email,
       password: hashedPassword,
       isVerified: false,
       isApproved: false,
-      role: "patient",
     });
 
-    const otp = generateOtp();
+    // OTP generate
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     await Otp.create({
       email,
       otp,
-      expiresAt: Date.now() + 10 * 60 * 1000, // 10 min
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    await sendEmail(email, `Your OTP is: ${otp}`);
+    await sendEmail(email, "OTP Verification", `Your OTP is ${otp}`);
 
-    res.json({
-      message: "OTP sent to email successfully",
-      patientId: patient._id,
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json({ message: "OTP sent to email" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-
-// ================================
-// 🔐 VERIFY OTP
-// ================================
+// 🔥 VERIFY OTP
 export const verifyOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
     const record = await Otp.findOne({ email, otp });
 
-    if (!record) {
-      return res.status(400).json({ message: "Invalid OTP" });
+    if (!record || record.expiresAt < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    if (record.expiresAt < Date.now()) {
-      return res.status(400).json({ message: "OTP expired" });
-    }
-
-    await Patient.findOneAndUpdate(
-      { email },
-      { isVerified: true }
-    );
-
+    await User.updateOne({ email }, { isVerified: true });
     await Otp.deleteMany({ email });
 
-    res.json({ message: "Account verified successfully" });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json({ message: "OTP verified successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-
-// ================================
-// 🔑 PATIENT LOGIN (ONLY VERIFIED)
-// ================================
-export const loginPatient = async (req, res) => {
+// 🔥 LOGIN
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const patient = await Patient.findOne({ email });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (!patient) {
-      return res.status(404).json({ message: "Patient not found" });
-    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
 
-    if (!patient.isVerified) {
-      return res.status(400).json({ message: "Please verify OTP first" });
-    }
+    if (!user.isVerified)
+      return res.status(403).json({ message: "Verify OTP first" });
 
-    const isMatch = await bcrypt.compare(password, patient.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Wrong password" });
-    }
+    if (!user.isApproved)
+      return res.status(403).json({ message: "Admin approval required" });
 
     const token = jwt.sign(
-      { id: patient._id, role: patient.role },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.json({
-      token,
-      user: {
-        _id: patient._id,
-        name: patient.name,
-        email: patient.email,
-        role: patient.role,
-      },
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json({ token, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-};
-
-
-// ================================
-// 👤 GET CURRENT STAFF (ADMIN)
-// ================================
-export const getMeStaff = async (req, res) => {
-  res.json(req.staff);
 };
