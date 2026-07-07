@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  // 💻 Laptop + 📱 Mobile dono ke liye hardcoded IPv4 Network configuration set kar di hai
+  baseURL: import.meta.env.VITE_API_URL || "http://192.168.31.233:5000/api",
 });
 
 // Attach staff token to every request properly
