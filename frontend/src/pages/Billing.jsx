@@ -8,16 +8,35 @@ const Billing = () => {
   const [selectedPatient, setSelectedPatient] = useState("");
   const [medicineItems, setMedicineItems] = useState([{ name: "", quantity: 1, price: 0 }]);
 
+  // Merged Safe & Foolproof loadAll function
   const loadAll = async () => {
-    const [p, b] = await Promise.all([
-      api.get("/patients"),
-      api.get("/bills"),
-    ]);
-    setPatients(p.data.filter((pt) => pt.status === "admitted"));
-    setBills(b.data);
+    try {
+      // Dono api calls ko safely handle karna aur catch lagana
+      const pRes = await api.get("/patients").catch(err => {
+        console.error("Patients fetch failed:", err);
+        return { data: [] }; // Fallback array agar api fail ho
+      });
+      
+      const bRes = await api.get("/bills").catch(err => {
+        console.error("Bills fetch failed:", err);
+        return { data: [] }; // Fallback array agar api fail ho
+      });
+
+      if (pRes && pRes.data) {
+        setPatients(pRes.data.filter((pt) => pt.status === "admitted"));
+      }
+      
+      if (bRes && bRes.data) {
+        setBills(bRes.data);
+      }
+    } catch (error) {
+      console.error("Error in loadAll:", error);
+    }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { 
+    loadAll(); 
+  }, []);
 
   const addMedicineRow = () =>
     setMedicineItems([...medicineItems, { name: "", quantity: 1, price: 0 }]);

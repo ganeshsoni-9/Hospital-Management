@@ -1,5 +1,5 @@
 import Bill from "../models/Bill.js";
-import Patient from "../models/user.js";
+import Patient from "../models/Patient.js";
 import Room from "../models/Room.js";
 import Doctor from "../models/Doctor.js";
 
@@ -30,7 +30,7 @@ export const generateBill = async (req, res) => {
 
     // Medicine Bill = sum of medicine items passed in
     const medicineBill = medicineItems.reduce(
-      (sum, item) => sum + item.quantity * item.price,
+      (sum, item) => sum + (item.quantity || 0) * (item.price || 0),
       0
     );
 

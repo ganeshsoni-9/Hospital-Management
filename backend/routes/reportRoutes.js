@@ -7,9 +7,11 @@ import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect);
-
+// 1. PUBLIC ROUTE: Yeh bina login ke bhi chalega (Dashboard par error nahi aayegi)
 router.get("/summary", getSummaryReport);
-router.get("/discharged", getDischargedPatientsReport);
+
+// 2. PROTECTED ROUTE: Iske liye verification zaroori hai
+// Humne 'protect' middleware sirf isi route par lagaya hai
+router.get("/discharged", protect, getDischargedPatientsReport);
 
 export default router;

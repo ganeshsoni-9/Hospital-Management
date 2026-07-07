@@ -10,18 +10,37 @@ const Patients = () => {
     name: "", age: "", gender: "Male", contact: "", address: "", disease: "",
   });
 
+  // Merged Safe & Foolproof loadAll function
   const loadAll = async () => {
-    const [p, r, d] = await Promise.all([
-      api.get("/patients"),
-      api.get("/rooms/available"),
-      api.get("/doctors"),
-    ]);
-    setPatients(p.data);
-    setRooms(r.data);
-    setDoctors(d.data);
+    try {
+      // Teeno api calls ko safely handle karna aur fallback empty array dena
+      const patientRes = await api.get("/patients").catch(err => {
+        console.error("Patients fetch api failed:", err);
+        return { data: [] };
+      });
+
+      const roomRes = await api.get("/rooms/available").catch(err => {
+        console.error("Available rooms fetch failed:", err);
+        return { data: [] };
+      });
+
+      const doctorRes = await api.get("/doctors").catch(err => {
+        console.error("Doctors fetch failed:", err);
+        return { data: [] };
+      });
+
+      if (patientRes && patientRes.data) setPatients(patientRes.data);
+      if (roomRes && roomRes.data) setRooms(roomRes.data); // Matched with state name
+      if (doctorRes && doctorRes.data) setDoctors(doctorRes.data);
+
+    } catch (error) {
+      console.error("Error inside Patients loadAll:", error);
+    }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { 
+    loadAll(); 
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -1,14 +1,15 @@
 import express from "express";
-import {
-  approvePatient,
-  deletePatient,
-  updatePayment,
-} from "../controllers/patientController.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
+// Jo bhi aapka controller ka naam ho, use import karein (jaise getAllPatients ya getPatients)
+import { getPatients, createPatient, assignRoom, assignDoctor, dischargePatient } from "../controllers/patientController.js"; 
 
 const router = express.Router();
 
-router.put("/approve/:id", approvePatient);
-router.delete("/delete/:id", deletePatient);
-router.put("/payment/:id", updatePayment);
+// 💡 Yeh check karo ki yahan path exact "/" hi hai na!
+router.get("/", verifyToken, getPatients); 
+router.post("/", verifyToken, createPatient);
+router.put("/:id/assign-room", verifyToken, assignRoom);
+router.put("/:id/assign-doctor", verifyToken, assignDoctor);
+router.put("/:id/discharge", verifyToken, dischargePatient);
 
 export default router;
