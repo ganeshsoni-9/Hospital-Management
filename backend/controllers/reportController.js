@@ -1,5 +1,5 @@
 import Bill from "../models/Bill.js";
-import Patient from "../models/User.js";
+import Patient from "../models/Patient.js";
 import Room from "../models/Room.js";
 import Doctor from "../models/Doctor.js";
 

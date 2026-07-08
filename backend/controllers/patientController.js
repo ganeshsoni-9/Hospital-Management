@@ -66,7 +66,11 @@ export const dischargePatient = async (req, res) => {
   try {
     const patient = await Patient.findByIdAndUpdate(
       req.params.id,
-      { status: "discharged", room: null }, // Room khaali kar diya discharge par
+      {
+        status: "discharged",
+        room: null,           // Room khaali kar diya discharge par
+        dischargeDate: new Date(), // Discharge date/time save kar rahe hain
+      },
       { new: true }
     );
     res.json(patient);
@@ -114,6 +118,19 @@ export const updatePayment = async (req, res) => {
     user.paymentStatus = status;
     await user.save();
     return res.json({ message: "Payment updated successfully", user });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// 9. 🗑️ DELETE A PATIENT RECORD (fully removes the patient)
+export const deletePatientRecord = async (req, res) => {
+  try {
+    const patient = await Patient.findById(req.params.id);
+    if (!patient) return res.status(404).json({ message: "Patient not found" });
+
+    await Patient.findByIdAndDelete(req.params.id);
+    return res.json({ message: "Patient deleted successfully" });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

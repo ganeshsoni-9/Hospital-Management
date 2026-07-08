@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api.js";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Covers: ADD Patient -> Assign Room -> Assign Doctor -> Discharge Patient
 const Patients = () => {
@@ -66,6 +68,73 @@ const Patients = () => {
     loadAll();
   };
 
+  // Permanently delete a patient's record (with confirmation)
+  const handleDeletePatient = async (patient) => {
+    const confirmed = window.confirm(
+      `Kya aap sach me "${patient.name}" ka poora record delete karna chahte hain? Yeh action wapas nahi ho sakta.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/patients/${patient._id}`);
+      loadAll(); // list turant refresh ho jayegi, Dashboard bhi agli baar load hone par updated count dikhayega
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Patient delete karne me error aayi. Console check karein.");
+    }
+  };
+
+  // Fetch this patient's bill (if any) to include final amount in the summary
+  const getPatientBill = async (patientId) => {
+    try {
+      const bRes = await api.get("/bills").catch(() => ({ data: [] }));
+      const allBills = bRes && bRes.data ? bRes.data : [];
+      return allBills.find(
+        (b) => b.patient?._id === patientId || b.patient === patientId
+      );
+    } catch (err) {
+      console.error("Bill fetch failed for summary:", err);
+      return null;
+    }
+  };
+
+  // Generate & download Discharge Summary PDF for a patient
+  const handleDownloadSummary = async (p) => {
+    const bill = await getPatientBill(p._id);
+
+    const admissionDate = p.admissionDate ? new Date(p.admissionDate) : null;
+    const dischargeDate = p.dischargeDate ? new Date(p.dischargeDate) : new Date();
+    const totalDays = admissionDate
+      ? Math.max(1, Math.ceil((dischargeDate - admissionDate) / (1000 * 60 * 60 * 24)))
+      : "N/A";
+
+    const doc = new jsPDF();
+    doc.text("Patient Discharge Summary", 14, 15);
+
+    const rows = [
+      ["Patient Name", p.name],
+      ["Age", p.age],
+      ["Gender", p.gender],
+      ["Contact", p.contact],
+      ["Disease", p.disease || "-"],
+      ["Room", p.room ? p.room.roomNumber : "-"],
+      ["Doctor", p.doctor ? p.doctor.name : "-"],
+      ["Admission Date", admissionDate ? admissionDate.toLocaleDateString() : "N/A"],
+      ["Discharge Date", dischargeDate.toLocaleDateString()],
+      ["Total Days Admitted", totalDays],
+      ["Final Bill Amount", bill ? `Rs. ${bill.totalAmount}` : "Not billed yet"],
+      ["Payment Status", bill ? bill.paymentStatus : "N/A"],
+    ];
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["Field", "Details"]],
+      body: rows,
+    });
+
+    doc.save(`discharge_summary_${p.name}.pdf`);
+  };
+
   return (
     <div className="container">
       <h2>Patients</h2>
@@ -94,7 +163,9 @@ const Patients = () => {
         <table>
           <thead>
             <tr>
-              <th>Name</th><th>Room</th><th>Doctor</th><th>Status</th><th>Assign Room</th><th>Assign Doctor</th><th>Action</th>
+              <th>Name</th><th>Room</th><th>Doctor</th><th>Status</th>
+              <th>Admission Date</th><th>Discharge Date</th>
+              <th>Assign Room</th><th>Assign Doctor</th><th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -108,6 +179,8 @@ const Patients = () => {
                     {p.status}
                   </span>
                 </td>
+                <td>{p.admissionDate ? new Date(p.admissionDate).toLocaleDateString() : "-"}</td>
+                <td>{p.dischargeDate ? new Date(p.dischargeDate).toLocaleDateString() : "-"}</td>
                 <td>
                   <select defaultValue="" onChange={(e) => handleAssignRoom(p._id, e.target.value)}>
                     <option value="">Select room</option>
@@ -125,9 +198,24 @@ const Patients = () => {
                   </select>
                 </td>
                 <td>
-                  {p.status === "admitted" && (
-                    <button onClick={() => handleDischarge(p._id)}>Discharge</button>
-                  )}
+                  <div className="flex flex-col sm:flex-row gap-1">
+                    {p.status === "admitted" && (
+                      <button onClick={() => handleDischarge(p._id)} className="w-full sm:w-auto">
+                        Discharge
+                      </button>
+                    )}
+                    {p.status !== "admitted" && (
+                      <button onClick={() => handleDownloadSummary(p)} className="w-full sm:w-auto">
+                        Download Summary
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeletePatient(p)}
+                      className="w-full sm:w-auto bg-red-600 hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

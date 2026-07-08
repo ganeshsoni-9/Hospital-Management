@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api.js";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // "Generate Bill" -> Room/Doctor/Medicine Bill -> "Pay Bill" (Yes/No) -> Discharge
 const Billing = () => {
@@ -16,7 +18,7 @@ const Billing = () => {
         console.error("Patients fetch failed:", err);
         return { data: [] }; // Fallback array agar api fail ho
       });
-      
+
       const bRes = await api.get("/bills").catch(err => {
         console.error("Bills fetch failed:", err);
         return { data: [] }; // Fallback array agar api fail ho
@@ -25,7 +27,7 @@ const Billing = () => {
       if (pRes && pRes.data) {
         setPatients(pRes.data.filter((pt) => pt.status === "admitted"));
       }
-      
+
       if (bRes && bRes.data) {
         setBills(bRes.data);
       }
@@ -34,8 +36,8 @@ const Billing = () => {
     }
   };
 
-  useEffect(() => { 
-    loadAll(); 
+  useEffect(() => {
+    loadAll();
   }, []);
 
   const addMedicineRow = () =>
@@ -64,34 +66,85 @@ const Billing = () => {
     alert("Payment recorded. Go to Patients tab to Discharge the patient.");
   };
 
+  // Download bill as PDF
+  const handleDownloadPDF = (bill) => {
+    const doc = new jsPDF();
+    doc.text("Hospital Bill", 14, 15);
+    doc.text(`Patient: ${bill.patient?.name || "N/A"}`, 14, 25);
+    doc.text(`Status: ${bill.paymentStatus}`, 14, 32);
+
+    const billRows = [
+      ["Room Bill", `Rs. ${bill.roomBill}`],
+      ["Doctor Bill", `Rs. ${bill.doctorBill}`],
+      ["Medicine Bill", `Rs. ${bill.medicineBill}`],
+      ["Total Amount", `Rs. ${bill.totalAmount}`],
+    ];
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Item", "Amount"]],
+      body: billRows,
+    });
+
+    doc.save(`bill_${bill.patient?.name || bill._id}.pdf`);
+  };
+
   return (
     <div className="container">
       <h2>Billing</h2>
 
       <div className="card">
         <h3>Generate Bill</h3>
-        <form onSubmit={handleGenerateBill}>
-          <select required value={selectedPatient} onChange={(e) => setSelectedPatient(e.target.value)}>
+        <form onSubmit={handleGenerateBill} className="flex flex-col gap-2">
+          <select
+            required
+            value={selectedPatient}
+            onChange={(e) => setSelectedPatient(e.target.value)}
+            className="w-full"
+          >
             <option value="">Select admitted patient</option>
             {patients.map((p) => (
               <option key={p._id} value={p._id}>{p.name}</option>
             ))}
           </select>
 
-          <h4>Medicine Bill Items</h4>
+          <h4 className="mt-2 mb-1">Medicine Bill Items</h4>
           {medicineItems.map((item, i) => (
-            <div key={i} style={{ display: "flex", gap: "8px" }}>
-              <input placeholder="Medicine name" value={item.name}
-                onChange={(e) => updateMedicineRow(i, "name", e.target.value)} />
-              <input type="number" placeholder="Qty" value={item.quantity}
-                onChange={(e) => updateMedicineRow(i, "quantity", Number(e.target.value))} />
-              <input type="number" placeholder="Price" value={item.price}
-                onChange={(e) => updateMedicineRow(i, "price", Number(e.target.value))} />
+            <div
+              key={i}
+              className="flex flex-col sm:flex-row gap-2 w-full"
+            >
+              <input
+                placeholder="Medicine name"
+                value={item.name}
+                onChange={(e) => updateMedicineRow(i, "name", e.target.value)}
+                className="w-full sm:flex-1"
+              />
+              <input
+                type="number"
+                placeholder="Qty"
+                value={item.quantity}
+                onChange={(e) => updateMedicineRow(i, "quantity", Number(e.target.value))}
+                className="w-full sm:w-24"
+              />
+              <input
+                type="number"
+                placeholder="Price"
+                value={item.price}
+                onChange={(e) => updateMedicineRow(i, "price", Number(e.target.value))}
+                className="w-full sm:w-28"
+              />
             </div>
           ))}
-          <button type="button" onClick={addMedicineRow}>+ Add Medicine</button>
-          <br />
-          <button type="submit">Generate Bill (Room + Doctor + Medicine)</button>
+
+          <div className="flex flex-col sm:flex-row gap-2 mt-2">
+            <button type="button" onClick={addMedicineRow} className="w-full sm:w-auto">
+              + Add Medicine
+            </button>
+            <button type="submit" className="w-full sm:w-auto">
+              Generate Bill (Room + Doctor + Medicine)
+            </button>
+          </div>
         </form>
       </div>
 
@@ -118,9 +171,16 @@ const Billing = () => {
                   </span>
                 </td>
                 <td>
-                  {b.paymentStatus === "pending" && (
-                    <button onClick={() => handlePay(b._id)}>Pay Bill</button>
-                  )}
+                  <div className="flex flex-col sm:flex-row gap-1">
+                    {b.paymentStatus === "pending" && (
+                      <button onClick={() => handlePay(b._id)} className="w-full sm:w-auto">
+                        Pay Bill
+                      </button>
+                    )}
+                    <button onClick={() => handleDownloadPDF(b)} className="w-full sm:w-auto">
+                      Download PDF
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,10 +1,29 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaHospital } from "react-icons/fa";
+import { FaHospital, FaSun, FaMoon } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const Navbar = () => {
   const { staff, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Dark mode state - initialized from localStorage (defaults to light)
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("theme") === "dark"
+  );
+
+  // Apply/remove the "dark" class on <html> whenever darkMode changes
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
   if (!staff) return null;
 
@@ -14,7 +33,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-slate-800 text-white px-6 py-4 shadow-lg">
+    <nav className="bg-slate-800 dark:bg-slate-950 text-white px-6 py-4 shadow-lg">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
 
         {/* Left Section */}
@@ -85,6 +104,15 @@ const Navbar = () => {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
+
+          {/* Dark mode toggle button */}
+          <button
+            onClick={toggleDarkMode}
+            aria-label="Toggle dark mode"
+            className="text-xl hover:text-blue-300 transition p-2 rounded-full hover:bg-slate-700"
+          >
+            {darkMode ? <FaSun /> : <FaMoon />}
+          </button>
 
           <span className="font-medium text-gray-200">
             {staff.name}
