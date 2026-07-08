@@ -10,6 +10,7 @@ import Doctors from "./pages/Doctors.jsx";
 import Patients from "./pages/Patients.jsx";
 import Billing from "./pages/Billing.jsx";
 import Reports from "./pages/Reports.jsx";
+import About from "./pages/About";
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/verify-otp" element={<VerifyOtp />} />
         <Route path="/" element={<Dashboard />} /> 
-        <Route path="/patients" element={<Patients />} /> 
+        <Route path="/patients" element={<Patients />} />
+        <Route path="/about" element={<About />} /> 
 
         {/* Baki sensitive routes abhi bhi protected reh sakte hain */}
         <Route path="/rooms" element={<PrivateRoute><Rooms /></PrivateRoute>} />
