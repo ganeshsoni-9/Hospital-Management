@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { FaHospital, FaSun, FaMoon } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const Navbar = () => {
-  const { staff, logout } = useAuth();
-  const navigate = useNavigate();
+  const { staff } = useAuth();
 
   // Dark mode state - initialized from localStorage (defaults to light)
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("theme") === "dark"
   );
+
+  // Dropdown state for Gmail avatar click
+  const [showEmailDropdown, setShowEmailDropdown] = useState(false);
 
   // Apply/remove the "dark" class on <html> whenever darkMode changes
   useEffect(() => {
@@ -27,10 +29,13 @@ const Navbar = () => {
 
   if (!staff) return null;
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  // Email is nested inside staff.user
+  const userEmail = staff.user?.email;
+
+  // Get first letter of email (uppercase)
+  const emailFirstLetter = userEmail
+    ? userEmail.charAt(0).toUpperCase()
+    : "?";
 
   return (
     <nav className="bg-slate-800 dark:bg-slate-950 text-white px-6 py-4 shadow-lg">
@@ -53,45 +58,27 @@ const Navbar = () => {
           {/* Navigation Links */}
           <div className="flex flex-wrap gap-5 text-base">
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/"
-            >
+            <Link className="hover:text-blue-300 transition" to="/">
               Dashboard
             </Link>
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/rooms"
-            >
+            <Link className="hover:text-blue-300 transition" to="/rooms">
               Rooms
             </Link>
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/doctors"
-            >
+            <Link className="hover:text-blue-300 transition" to="/doctors">
               Doctors
             </Link>
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/patients"
-            >
+            <Link className="hover:text-blue-300 transition" to="/patients">
               Patients
             </Link>
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/billing"
-            >
+            <Link className="hover:text-blue-300 transition" to="/billing">
               Billing
             </Link>
 
-            <Link
-              className="hover:text-blue-300 transition"
-              to="/reports"
-            >
+            <Link className="hover:text-blue-300 transition" to="/reports">
               Reports
             </Link>
 
@@ -115,15 +102,26 @@ const Navbar = () => {
           </button>
 
           <span className="font-medium text-gray-200">
-            {staff.name}
+            {staff.user?.name}
           </span>
 
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md font-medium transition duration-200"
-          >
-            Logout
-          </button>
+          {/* Gmail avatar - orange bg, white letter, click shows email name */}
+          <div className="relative">
+            <button
+              onClick={() => setShowEmailDropdown((prev) => !prev)}
+              aria-label="Show Gmail account"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg transition"
+            >
+              {emailFirstLetter}
+            </button>
+
+            {/* Dropdown showing only the email name */}
+            {showEmailDropdown && (
+              <div className="absolute right-0 top-full mt-2 whitespace-nowrap bg-slate-900 text-white text-sm px-3 py-1.5 rounded-md shadow-lg z-50">
+                {userEmail || "No email found"}
+              </div>
+            )}
+          </div>
 
         </div>
 
