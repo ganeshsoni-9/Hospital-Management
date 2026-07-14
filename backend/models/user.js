@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: "admin" },
   isVerified: { type: Boolean, default: false },
   isApproved: { type: Boolean, default: false },
-  otp: { type: String, default: null } // 👈 Yeh field add karna compulsory hai
+  otp: { type: String, default: null },        // OTP store karne ke liye
+  otpExpiry: { type: Date, default: null }      // 👈 naya field - OTP kab expire hoga
 }, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);

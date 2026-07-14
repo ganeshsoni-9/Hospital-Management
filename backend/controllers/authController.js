@@ -1,23 +1,13 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
+import { sendOTPEmail } from "../utils/sendEmail.js"; // 👈 apni sendEmail.js ka sahi path daalo
 
-// Nodemailer Transporter Setup
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-// 1. SAFE REGISTER & SEND REAL EMAIL OTP (Merged & Foolproof)
+// 1. REGISTER & SEND OTP VIA BREVO
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    
-    // 1. Basic validation fields check
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields (Name, Email, Password) are required." });
     }
@@ -28,8 +18,9 @@ export const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 6-digit verification code
+    // 6-digit OTP
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes valid
 
     user = new User({
       name,
@@ -38,41 +29,28 @@ export const register = async (req, res) => {
       role: "admin",
       isVerified: false,
       isApproved: false,
-      otp: generatedOtp 
+      otp: generatedOtp,
+      otpExpiry,
     });
 
     await user.save();
-    
-    // 2. Safe Mail Sending Blocks
+
     try {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Hospital Portal - Account Verification OTP",
-        html: `<h3>Welcome ${name},</h3>
-               <p>Your verification OTP code is: <strong>${generatedOtp}</strong></p>
-               <p>Please enter this code to activate your staff account.</p>`
-      };
-
-      await transporter.sendMail(mailOptions);
-      return res.status(201).json({ message: "Registration successful. OTP sent to your Gmail!" });
-
+      await sendOTPEmail(email, generatedOtp);
+      return res.status(201).json({ message: "Registration successful. OTP sent to your email!" });
     } catch (mailError) {
-      console.error("Nodemailer Email Error:", mailError);
-      // Fallback: Agar email network issue se na bhi jaye, toh response fail na karein, bypass dummy code 123456
-      return res.status(201).json({ 
-        message: "User saved permanently! (Email delivery failed, use test OTP: 123456 to verify)", 
-        testMode: true 
+      console.error("Brevo Email Error:", mailError.response?.data || mailError.message);
+      return res.status(201).json({
+        message: "User registered, but OTP email failed to send. Please use resend OTP option.",
       });
     }
-
   } catch (err) {
     console.error("Main Register Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// 2. LOGIN FUNCTION (Matches exact credentials for lifetime)
+// 2. LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -81,7 +59,7 @@ export const login = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.isVerified) {
-      return res.status(403).json({ message: "Verify OTP first" });
+      return res.status(403).json({ message: "Please verify your email OTP first" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -89,8 +67,8 @@ export const login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || "fallback_secret_key",
-      { expiresIn: "7d" }
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
     );
 
     res.json({ token, user, message: "Login successful" });
@@ -99,7 +77,7 @@ export const login = async (req, res) => {
   }
 };
 
-// 3. VERIFY OTP FUNCTION
+// 3. VERIFY OTP
 export const verifyOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -111,15 +89,46 @@ export const verifyOtp = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (otp === "123456" || user.otp === otp) {
-      user.isVerified = true;
-      user.isApproved = true; 
-      user.otp = null; // OTP Clear after verify
-      await user.save();
-      return res.status(200).json({ message: "OTP Verified Successfully! You can now login." });
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
     }
 
-    return res.status(400).json({ message: "Invalid OTP code" });
+    if (!user.otp || user.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code" });
+    }
+
+    if (user.otpExpiry < new Date()) {
+      return res.status(400).json({ message: "OTP expired. Please request a new one." });
+    }
+
+    user.isVerified = true;
+    user.isApproved = true;
+    user.otp = null;
+    user.otpExpiry = null;
+    await user.save();
+
+    return res.status(200).json({ message: "OTP Verified Successfully! You can now login." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// 4. RESEND OTP (bonus - agar user ka OTP expire ho jaaye)
+export const resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.isVerified) return res.status(400).json({ message: "User already verified" });
+
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = newOtp;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    await sendOTPEmail(email, newOtp);
+    res.status(200).json({ message: "New OTP sent to your email" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
