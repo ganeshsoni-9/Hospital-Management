@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import User from "../models/user.js";
 
 export const protect = async (req, res, next) => {
   let token;
@@ -12,7 +12,7 @@ export const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "HospitalManagementSystemSecretKey2026@#$");
 
       req.user = await User.findById(decoded.id).select("-password");
-      
+
       if (!req.user) {
         return res.status(401).json({ message: "User not found with this token" });
       }
@@ -29,5 +29,4 @@ export const protect = async (req, res, next) => {
   }
 };
 
-// 👈 Yeh line niche add kar do, saare route chal jayenge
 export const verifyToken = protect;

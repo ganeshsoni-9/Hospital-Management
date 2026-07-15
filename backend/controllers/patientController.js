@@ -1,5 +1,5 @@
 import Patient from "../models/Patient.js";
-import User from "../models/User.js";
+import User from "../models/user.js";
 
 // 1. GET ALL PATIENTS
 export const getPatients = async (req, res) => {
@@ -68,8 +68,8 @@ export const dischargePatient = async (req, res) => {
       req.params.id,
       {
         status: "discharged",
-        room: null,           // Room khaali kar diya discharge par
-        dischargeDate: new Date(), // Discharge date/time save kar rahe hain
+        room: null,
+        dischargeDate: new Date(),
       },
       { new: true }
     );

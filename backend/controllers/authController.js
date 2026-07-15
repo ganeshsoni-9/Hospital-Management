@@ -1,7 +1,7 @@
-import User from "../models/User.js";
+import User from "../models/user.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { sendOTPEmail } from "../utils/sendEmail.js"; // 👈 apni sendEmail.js ka sahi path daalo
+import { sendOTPEmail } from "../utils/sendEmail.js";
 
 // 1. REGISTER & SEND OTP VIA BREVO
 export const register = async (req, res) => {
