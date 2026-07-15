@@ -2,7 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   // 💻 Laptop + 📱 Mobile dono ke liye hardcoded IPv4 Network configuration set kar di hai
-  baseURL: import.meta.env.VITE_API_URL || "http://192.168.31.233:5000/api",
+baseURL: import.meta.env.VITE_API_URL || "https://hospital-management-1rgc.onrender.com/api",
 });
 
 // Attach staff token to every request properly
